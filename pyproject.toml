@@ -1,0 +1,16 @@
+[project]
+name = "rpis-lib"
+version = "0.1.0"
+description = "Library with functions used later on on probability exam"
+authors = [
+    { name = "Rafał Mazur", email = "raf.mazur.000@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "scipy>=1.17.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.13",
+]
