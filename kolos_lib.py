@@ -253,7 +253,7 @@ def hipoteza_sredniej_jedna_proba(
         
     Example:
         >>> probka_makaronu = [460, 462, 458, 466, 457]
-        >>> test_sredniej_jedna_proba(probka_makaronu, 454.0, 0.01, typ_hipotezy="O")
+        >>> hipoteza_sredniej_jedna_proba(probka_makaronu, 454.0, 0.01, typ_hipotezy="O")
         False  # Odrzucamy H0, faktyczna średnia jest inna.
     """
     n = len(probka)
@@ -270,7 +270,7 @@ def hipoteza_sredniej_jedna_proba(
 
     if uzyj_rozkadu_normalnego:
         if typ_hipotezy == 'L':
-            war_kryt = norm.ppf(poziom_istotnosci)
+            war_kryt = -norm.ppf(1 - poziom_istotnosci)
             return bool(statystyka > war_kryt)
         elif typ_hipotezy == 'P':
             war_kryt = norm.ppf(1 - poziom_istotnosci)
@@ -281,7 +281,7 @@ def hipoteza_sredniej_jedna_proba(
     else:
         stopien_swobody = n - 1
         if typ_hipotezy == 'L':
-            war_kryt = t.ppf(poziom_istotnosci, stopien_swobody)
+            war_kryt = -t.ppf(1 - poziom_istotnosci, stopien_swobody)
             return bool(statystyka > war_kryt)
         elif typ_hipotezy == 'P':
             war_kryt = t.ppf(1 - poziom_istotnosci, stopien_swobody)
@@ -328,7 +328,7 @@ def hipoteza_porownania_srednich(
         statystyka = (srednia1 - srednia2) / blad_standardowy
 
         if typ_hipotezy == 'L':
-            wart_kryt = norm.ppf(poziom_istotnosci)
+            wart_kryt = -norm.ppf(1 - poziom_istotnosci)
             return bool(statystyka > wart_kryt)
         elif typ_hipotezy == 'P':
             wart_kryt = norm.ppf(1 - poziom_istotnosci)
@@ -345,7 +345,7 @@ def hipoteza_porownania_srednich(
         df = n1 + n2 - 2
 
         if typ_hipotezy == 'L':
-            wart_kryt = t.ppf(poziom_istotnosci, df)
+            wart_kryt = -t.ppf(1 - poziom_istotnosci, df)
             return bool(statystyka > wart_kryt)
         elif typ_hipotezy == 'P':
             wart_kryt = t.ppf(1 - poziom_istotnosci, df)
