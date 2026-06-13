@@ -54,28 +54,28 @@ def poisson_with_error(n: int, p: float, ks: list[int]) -> tuple[float, float]:
     return sum(result), (lam ** 2) / n
 
 
-def CTG(n: int, mu: float, sigma: float, lower_lim: float = -math.inf, upper_lim: float = math.inf) -> float:
+def CTG(n: int, mu: float, sigma: float, dol: float = -math.inf, gora: float = math.inf) -> float:
     """
     Szacuje prawdopodobieństwo na podstawie Centralnego Twierdzenia Granicznego (CTG).
 
     Oblicza prawdopodobieństwo tego, że suma `n` niezależnych zmiennych losowych
-    o podanej wartości oczekiwanej i odchyleniu standardowym wpadnie w przedział [d, g].
+    o podanej wartości oczekiwanej i odchyleniu standardowym wpadnie w przedział [dol, gora].
 
     Args:
         n (int): Liczba niezależnych zmiennych losowych w sumie.
         mu (float): Wartość oczekiwana (średnia) pojedynczej zmiennej losowej.
         sigma (float): Odchylenie standardowe pojedynczej zmiennej losowej.
-        lower_lim (float, optional): Dolne ograniczenie przedziału. Domyślnie -inf.
-        upper_lim (float, optional): Górne ograniczenie przedziału. Domyślnie +inf.
+        dol (float, optional): Dolne ograniczenie przedziału. Domyślnie -inf.
+        gora (float, optional): Górne ograniczenie przedziału. Domyślnie +inf.
 
     Returns:
-        float: Szacowane prawdopodobieństwo znalezienia się sumy w przedziale [lower_lim, upper_lim].
+        float: Szacowane prawdopodobieństwo znalezienia się sumy w przedziale [dol, gora].
 
     Example:
         >>> CTG(400, 0.3, math.sqrt(0.3 * 0.7), lower_lim=130)
         0.13761676203741713
     """
-    return norm.cdf((upper_lim - n * mu) / (sigma * math.sqrt(n))) - norm.cdf((lower_lim - n * mu) / (sigma * math.sqrt(n)))
+    return norm.cdf((gora - n * mu) / (sigma * math.sqrt(n))) - norm.cdf((dol - n * mu) / (sigma * math.sqrt(n)))
 
 
 def rozmiar(p: float, d: float, pb: float) -> int:
@@ -235,6 +235,7 @@ def hipoteza_sredniej_jedna_proba(
 ) -> bool:
     """
     Weryfikuje hipotezę o wartości średniej populacji na podstawie jednej próby.
+    W skrócie -  mówi, czy utzymujemy hipotezę zerową.
     
     W zależności od tego, czy znamy odchylenie standardowe populacji oraz 
     od wielkości próby, funkcja automatycznie dobiera odpowiedni test: 
