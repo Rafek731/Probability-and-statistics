@@ -28,7 +28,7 @@ def poisson(n: int, p: float, k: int) -> float:
     return (lam**k) / math.factorial(k) * math.exp(-lam)
 
 
-def poisson_with_error(n: int, p: float, ks: list[int]) -> tuple[float, float]:
+def poisson_ext(n: int, p: float, ks: list[int]) -> tuple[float, float]:
     """
     Szacuje prawdopodobieństwo uzyskania liczby sukcesów ze zbioru `k` oraz błąd oszacowania.
     
@@ -41,7 +41,7 @@ def poisson_with_error(n: int, p: float, ks: list[int]) -> tuple[float, float]:
         k (list[int]): lista interesujących nas ilości sukcesów (np. [0, 1, 2]).
 
     Returns:
-        Tuple[float, float]: Krotka zawierająca:
+        tuple[float, float]: Krotka zawierająca:
             - Szacowane prawdopodobieństwo otrzymania liczby sukcesów podanej w liście.
             - Maksymalny błąd tego oszacowania.
 
@@ -101,7 +101,7 @@ def rozmiar(p: float, d: float, pb: float) -> int:
 # CZĘŚĆ II: Estymatory (XI_Estymatory.ipynb)
 # ==========================================
 
-def no_estymator_wariancji(dane: list[float]) -> float:
+def NEW(dane: list[float]) -> float:
     """
     Oblicza nieobciążony estymator wariancji dla podanej próby.
 
@@ -121,7 +121,7 @@ def no_estymator_wariancji(dane: list[float]) -> float:
     return sum(sq_diff) / (n - 1)
 
 
-def przedzial_ufnosci_srednia(dane: list[float], odch_standardowe: float, alfa: float) -> tuple[float, float]:
+def esty_sr(dane: list[float], sigma: float, alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla wartości średniej przy znanym odchyleniu standardowym populacji.
 
@@ -139,11 +139,11 @@ def przedzial_ufnosci_srednia(dane: list[float], odch_standardowe: float, alfa: 
     """
     n = len(dane)
     x_bar = sum(dane) / n
-    r = norm.ppf(1 - alfa / 2) * odch_standardowe / math.sqrt(n)
+    r = norm.ppf(1 - alfa / 2) * sigma / math.sqrt(n)
     return float(x_bar - r), float(x_bar + r)
 
 
-def przedzial_ufnosci_srednia_bez_odch_stand(dane: list[float], alfa: float) -> tuple[float, float]:
+def esty_sr_bez_od(dane: list[float], alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla wartości średniej przy nieznanym odchyleniu standardowym populacji.
     
@@ -156,7 +156,7 @@ def przedzial_ufnosci_srednia_bez_odch_stand(dane: list[float], alfa: float) -> 
         alfa (float): Poziom błędu (np. 0.05 dla poziomu ufności 95%).
 
     Returns:
-        Tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności.
+        tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności.
 
     Example:
         >>> esty_sr_bez_od([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 0.05)
@@ -164,7 +164,7 @@ def przedzial_ufnosci_srednia_bez_odch_stand(dane: list[float], alfa: float) -> 
     """
     n = len(dane)
     x_bar = sum(dane) / n
-    s = math.sqrt(no_estymator_wariancji(dane))
+    s = math.sqrt(NEW(dane))
 
     if n <= 30:
         dist = t.ppf(1 - alfa / 2, n - 1)
@@ -176,7 +176,7 @@ def przedzial_ufnosci_srednia_bez_odch_stand(dane: list[float], alfa: float) -> 
     return float(x_bar - r), float(x_bar + r)
 
 
-def przedzial_ufnosci_wariancja(dane: list[float], alfa: float) -> tuple[float, float]:
+def esty_war(dane: list[float], alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla wariancji z wykorzystaniem rozkładu chi-kwadrat.
 
@@ -185,18 +185,18 @@ def przedzial_ufnosci_wariancja(dane: list[float], alfa: float) -> tuple[float, 
         alfa (float): Poziom błędu (np. 0.05 dla poziomu ufności 95%).
 
     Returns:
-        Tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności dla wariancji.
+        tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności dla wariancji.
 
     Example:
         >>> esty_war([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 0.05)
         (0.020028631166238927, 0.14109075746397742)
     """
     n = len(dane)
-    numerator = (n - 1) * no_estymator_wariancji(dane)
+    numerator = (n - 1) * NEW(dane)
     return float(numerator / chi2.ppf(1 - alfa / 2, n - 1)), float(numerator / chi2.ppf(alfa / 2, n - 1))
 
 
-def przedzial_ufnosci_proporcja(lista: list[Any], wart: Any, alfa: float) -> tuple[float, float]:
+def esty_prop(lista: list[Any], wart: Any, alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla proporcji (częstości występowania danej wartości w populacji).
 
@@ -226,11 +226,11 @@ hipotezy zerowej (H0), lub False, gdy należy ją odrzucić na rzecz hipotezy al
 """
 
 
-def hipoteza_sredniej_jedna_proba(
+def hipoteza_srednia(
     probka: list[float],
     srednia_h0: float,
-    poziom_istotnosci: float,
-    odchylenie_populacji: Optional[float] = None,
+    alfa: float,
+    sigma: Optional[float] = None,
     typ_hipotezy: Literal["L", "P", "O"] = "O"
 ) -> bool:
     """
@@ -244,115 +244,114 @@ def hipoteza_sredniej_jedna_proba(
     Parameters:
         probka (list[float]): Pomiary w badanej próbie.
         srednia_h0 (float): Zakładana wartość średnia populacji (hipoteza H0).
-        poziom_istotnosci (float): Dopuszczalne ryzyko błędu I rodzaju (alfa), np. 0.05.
-        odchylenie_populacji (float, opcjonalnie): Znane odchylenie populacji. 
+        alfa (float): Dopuszczalne ryzyko błędu I rodzaju, np. 0.05.
+        sigma (float, opcjonalnie): Znane odchylenie populacji. 
             Jeśli brak, funkcja wyestymuje je na podstawie próby.
-        typ_hipotezy (Literal["L", "P", "O"]): Rodzaj testu: Lewostronny, Prawostronny lub Obustronny.
+        typ_hipotezy (Literal["L", "P", "O"]): Rodzaj hipotezy: Lewostronna, Prawostronna lub Obustronna.
         
     Returns:
         bool: True, jeśli utrzymujemy hipotezę zerową (H0); False, jeśli ją odrzucamy.
         
     Example:
         >>> probka_makaronu = [460, 462, 458, 466, 457]
-        >>> hipoteza_sredniej_jedna_proba(probka_makaronu, 454.0, 0.01, typ_hipotezy="O")
+        >>> hipoteza_srednia(probka_makaronu, 454.0, 0.01, typ_hipotezy="O")
         False  # Odrzucamy H0, faktyczna średnia jest inna.
     """
     n = len(probka)
     srednia_proby = sum(probka) / n
 
-    if odchylenie_populacji is not None:
-        sigma = odchylenie_populacji
+    if sigma is not None:
         uzyj_rozkadu_normalnego = True
     else:
-        sigma = math.sqrt(no_estymator_wariancji(probka)) if n > 1 else 0.0
+        sigma = math.sqrt(NEW(probka)) if n > 1 else 0.0
         uzyj_rozkadu_normalnego = n > 30
 
     statystyka = (srednia_proby - srednia_h0) * math.sqrt(n) / sigma
 
     if uzyj_rozkadu_normalnego:
         if typ_hipotezy == 'L':
-            war_kryt = -norm.ppf(1 - poziom_istotnosci)
-            return bool(statystyka > war_kryt)
+            wart_kryt = norm.ppf(alfa)
+            return bool(statystyka > wart_kryt)
         elif typ_hipotezy == 'P':
-            war_kryt = norm.ppf(1 - poziom_istotnosci)
-            return bool(statystyka < war_kryt)
-        else: # Obustronny
-            war_kryt = norm.ppf(1 - poziom_istotnosci / 2)
-            return bool(-war_kryt < statystyka < war_kryt)
+            wart_kryt = norm.ppf(1 - alfa)
+            return bool(statystyka < wart_kryt)
+        else: # Obustronna
+            wart_kryt = norm.ppf(1 - alfa / 2)
+            return bool(-wart_kryt < statystyka < wart_kryt)
     else:
-        stopien_swobody = n - 1
+        df = n - 1
         if typ_hipotezy == 'L':
-            war_kryt = -t.ppf(1 - poziom_istotnosci, stopien_swobody)
-            return bool(statystyka > war_kryt)
+            wart_kryt = -t.ppf(1 - alfa, df)
+            return bool(statystyka > wart_kryt)
         elif typ_hipotezy == 'P':
-            war_kryt = t.ppf(1 - poziom_istotnosci, stopien_swobody)
-            return bool(statystyka < war_kryt)
-        else: # Obustronny
-            war_kryt = t.ppf(1 - poziom_istotnosci / 2, stopien_swobody)
-            return bool(-war_kryt < statystyka < war_kryt)
+            wart_kryt = t.ppf(1 - alfa, df)
+            return bool(statystyka < wart_kryt)
+        else: # Obustronna
+            wart_kryt = t.ppf(1 - alfa / 2, df)
+            return bool(-wart_kryt < statystyka < wart_kryt)
 
 
-def hipoteza_porownania_srednich(
+def hipoteza_porownanie_srednich(
     probka1: list[float],
     probka2: list[float],
-    poziom_istotnosci: float,
-    odchylenie_pop_1: Optional[float] = None,
-    odchylenie_pop_2: Optional[float] = None,
+    alfa: float,
+    sigma1: Optional[float] = None,
+    sigma2: Optional[float] = None,
     typ_hipotezy: Literal["L", "P", "O"] = "O"
 ) -> bool:
     """
     Testuje hipotezę o równości dwóch średnich niezależnych próbek.
     
     Automatycznie dobiera test Z (jeśli znane są odchylenia obu populacji)
-    lub test t-Studenta dla dwóch prób (stosując model ze spulowaną wariancją).
+    lub test t-Studenta dla dwóch prób.
     
     Parameters:
         probka1 (list[float]): Pomiary z pierwszej grupy.
         probka2 (list[float]): Pomiary z drugiej grupy.
-        poziom_istotnosci (float): Poziom istotności testu (alfa).
-        odchylenie_pop_1 (float, opcjonalnie): Odchylenie standardowe populacji pierwszej.
-        odchylenie_pop_2 (float, opcjonalnie): Odchylenie standardowe populacji drugiej.
+        alfa (float): Poziom istotności testu (alfa).
+        sigma1 (float, opcjonalnie): Odchylenie standardowe populacji pierwszej.
+        sigma2 (float, opcjonalnie): Odchylenie standardowe populacji drugiej.
         typ_hipotezy (Literal["L", "P", "O"]): Lewostronny, Prawostronny, lub Obustronny.
         
     Returns:
         bool: True, jeśli utrzymujemy hipotezę zerową (brak różnic w średnich).
         
     Example:
-        >>> test_porownania_srednich([2.1, 5.3, 1.4], [1.9, 0.5, 2.8], 0.1, typ_hipotezy="P")
+        >>> hipoteza_porownanie_srednich([2.1, 5.3, 1.4], [1.9, 0.5, 2.8], 0.1, typ_hipotezy="P")
         True
     """
     n1, n2 = len(probka1), len(probka2)
     srednia1, srednia2 = sum(probka1) / n1, sum(probka2) / n2
 
-    if odchylenie_pop_1 is not None and odchylenie_pop_2 is not None:
-        blad_standardowy = math.sqrt((odchylenie_pop_1**2 / n1) + (odchylenie_pop_2**2 / n2))
-        statystyka = (srednia1 - srednia2) / blad_standardowy
+    if sigma1 is not None and sigma2 is not None:
+        mianownik = math.sqrt((sigma1**2 / n1) + (sigma2**2 / n2))
+        statystyka = (srednia1 - srednia2) / mianownik
 
         if typ_hipotezy == 'L':
-            wart_kryt = -norm.ppf(1 - poziom_istotnosci)
+            wart_kryt = -norm.ppf(1 - alfa)
             return bool(statystyka > wart_kryt)
         elif typ_hipotezy == 'P':
-            wart_kryt = norm.ppf(1 - poziom_istotnosci)
+            wart_kryt = norm.ppf(1 - alfa)
             return bool(statystyka < wart_kryt)
         else: # Obustronny
-            wart_kryt = norm.ppf(1 - poziom_istotnosci / 2)
+            wart_kryt = norm.ppf(1 - alfa / 2)
             return bool(-wart_kryt < statystyka < wart_kryt)
     else:
-        war1, war2 = no_estymator_wariancji(probka1), no_estymator_wariancji(probka2)
+        war1, war2 = NEW(probka1), NEW(probka2)
         wariancja_spulowana = ((n1 - 1) * war1 + (n2 - 1) * war2) / (n1 + n2 - 2)
-        blad_standardowy = math.sqrt(wariancja_spulowana * (1 / n1 + 1 / n2))
+        mianownik = math.sqrt(wariancja_spulowana * (1 / n1 + 1 / n2))
         
-        statystyka = (srednia1 - srednia2) / blad_standardowy
+        statystyka = (srednia1 - srednia2) / mianownik
         df = n1 + n2 - 2
 
         if typ_hipotezy == 'L':
-            wart_kryt = -t.ppf(1 - poziom_istotnosci, df)
+            wart_kryt = -t.ppf(1 - alfa, df)
             return bool(statystyka > wart_kryt)
         elif typ_hipotezy == 'P':
-            wart_kryt = t.ppf(1 - poziom_istotnosci, df)
+            wart_kryt = t.ppf(1 - alfa, df)
             return bool(statystyka < wart_kryt)
         else: # Obustronny
-            wart_kryt = t.ppf(1 - poziom_istotnosci / 2, df)
+            wart_kryt = t.ppf(1 - alfa / 2, df)
             return bool(-wart_kryt < statystyka < wart_kryt)
 
 
@@ -360,7 +359,7 @@ def hipoteza_zmienne_zalezne(
     probka1: list[float],
     probka2: list[float],
     roznica_h0: float,
-    poziom_istotnosci: float,
+    alfa: float,
     typ_hipotezy: Literal["L", "P", "O"] = "O"
 ) -> bool:
     """
@@ -371,7 +370,7 @@ def hipoteza_zmienne_zalezne(
         probka2 (list[float]): Pomiary 1
         probka1 (list[float]): Pomiary 2
         roznica_h0 (float): Hipotetyczna średnia różnica (H0), przeważnie 0.
-        poziom_istotnosci (float): Poziom istotności (alfa).
+        alfa (float): Poziom istotności.
         typ_hipotezy (Literal["L", "P", "O"]): Kierunek hipotezy.
         
     Returns:
@@ -380,7 +379,7 @@ def hipoteza_zmienne_zalezne(
     Example:
         >>> przed = [13, 12, 16, 9]
         >>> po = [17, 11, 22, 18]
-        >>> test_zmiennych_zaleznych(przed, po, 0, 0.05, typ_hipotezy="O")
+        >>> hipoteza_zmienne_zalezne(przed, po, 0, 0.05, typ_hipotezy="O")
         False
     """
     if len(probka1) != len(probka2):
@@ -390,25 +389,25 @@ def hipoteza_zmienne_zalezne(
     n = len(roznice)
     d_srednie = sum(roznice) / n
 
-    s_d = no_estymator_wariancji(roznice)
+    s_d = NEW(roznice)
 
     statystyka = (d_srednie - roznica_h0) * math.sqrt(n) / s_d
     match typ_hipotezy:
         case 'L':
-            wart_kryt = -t.ppf(1 - poziom_istotnosci, n - 1)
+            wart_kryt = -t.ppf(1 - alfa, n - 1)
             return bool(statystyka > wart_kryt)
         case 'R':
-            wart_kryt = t.ppf(1 - poziom_istotnosci, n - 1)
+            wart_kryt = t.ppf(1 - alfa, n - 1)
             return bool(statystyka < wart_kryt)  
         case _:
-            wart_kryt = t.ppf(1 - poziom_istotnosci / 2, n - 1)
+            wart_kryt = t.ppf(1 - alfa / 2, n - 1)
             return bool(-wart_kryt < statystyka < wart_kryt)
 
 
-def hipoteza_wariancji(
+def hipoteza_wariancja(
     probka: list[float],
     wariancja_h0: float,
-    poziom_istotnosci: float,
+    alfa: float,
     typ_testu: Literal["L", "P", "O"] = "O"
 ) -> bool:
     """
@@ -418,34 +417,34 @@ def hipoteza_wariancji(
     Parameters:
         probka (list[float]): Pomiary z próby.
         wariancja_h0 (float): Hipotetyczna wariancja populacji.
-        poziom_istotnosci (float): Poziom istotności testu (alfa).
+        alfa (float): Poziom istotności testu.
         typ_testu (Literal["L", "P", "O"]): Lewostronny, Prawostronny lub Obustronny.
         
     Returns:
         bool: True, jeśli utrzymujemy hipotezę zerową (wariancja populacji wynosi wariancja_h0).
         
     Example:
-        >>> test_wariancji([1.2, 1.1, 1.4, 0.9, 1.0], 0.1, 0.05, typ_testu="O")
+        >>> hipoteza_wariancja([1.2, 1.1, 1.4, 0.9, 1.0], 0.1, 0.05, typ_testu="O")
         True
     """
     n = len(probka)
-    wariancja_proby = no_estymator_wariancji(probka)
+    wariancja_proby = NEW(probka)
     statystyka = (n - 1) * wariancja_proby / wariancja_h0
     df = n - 1
 
     if typ_testu == 'L':
-        wart_kryt = chi2.ppf(poziom_istotnosci, df)
+        wart_kryt = chi2.ppf(alfa, df)
         return bool(statystyka > wart_kryt)
     elif typ_testu == 'P':
-        wart_kryt = chi2.ppf(1 - poziom_istotnosci, df)
+        wart_kryt = chi2.ppf(1 - alfa, df)
         return bool(statystyka < wart_kryt)
     else: # Obustronny
-        wart_kryt_dolna = chi2.ppf(poziom_istotnosci / 2, df)
-        wart_kryt_gorna = chi2.ppf(1 - poziom_istotnosci / 2, df)
+        wart_kryt_dolna = chi2.ppf(alfa / 2, df)
+        wart_kryt_gorna = chi2.ppf(1 - alfa / 2, df)
         return bool(wart_kryt_dolna < statystyka < wart_kryt_gorna)
 
 
-def hipoteza_zgodnosci_rownomierny(obserwacje: list[int], poziom_istotnosci: float) -> bool:
+def spr_rowno(obserwacje: list[int], alfa: float) -> bool:
     """
     Przeprowadza test zgodności chi2, sprawdzając, czy dane 
     zostały pobrane z równomiernego rozkładu prawdopodobieństwa.
@@ -456,29 +455,29 @@ def hipoteza_zgodnosci_rownomierny(obserwacje: list[int], poziom_istotnosci: flo
     
     Parameters:
         obserwacje (list[int]): lista zliczeń zdarzeń w poszczególnych "koszykach".
-        poziom_istotnosci (float): Poziom istotności testu (alfa).
+        alfa (float): Poziom istotności testu.
         
     Returns:
         bool: True, jeśli dane zachowują się jak pochodzące z rozkładu równomiernego.
         
     Example:
-        >>> test_zgodnosci_rownomierny([20, 30, 40], 0.05)
+        >>> spr_rowno([20, 30, 40], 0.05)
         False  # Dane zbyt mocno odchylają się od oczekiwanej wartości [30, 30, 30].
     """
-    liczba_kategorii = len(obserwacje)
-    oczekiwana = sum(obserwacje) / liczba_kategorii
-    statystyka = sum(((obs - oczekiwana) ** 2) / oczekiwana for obs in obserwacje)
+    n = len(obserwacje)
+    oczekiwane = sum(obserwacje) / n
+    statystyka = sum(((obs - oczekiwane) ** 2) / oczekiwane for obs in obserwacje)
     
-    df = liczba_kategorii - 1
-    war_kryt = chi2.ppf(1 - poziom_istotnosci, df)
+    df = n - 1
+    wart_kryt = chi2.ppf(1 - alfa, df)
     
-    return bool(statystyka < war_kryt)
+    return bool(statystyka < wart_kryt)
 
 
-def hipoteza_zgodnosci_poisson(
+def spr_poisson(
     obserwacje: list[int],
     lam: float,
-    poziom_istotnosci: float
+    alfa: float
 ) -> bool:
     """
     Przeprowadza test zgodności chi2 w celu weryfikacji, czy liczebności
@@ -490,28 +489,28 @@ def hipoteza_zgodnosci_poisson(
     
     Parameters:
         obserwacje (list[int]): lista zliczeń (indeks odpowiada liczbie badanych rzadkich zdarzeń).
-        lambda_param (float): Hipotetyczny parametr intensywności lambda dla rozkładu Poissona.
-        poziom_istotnosci (float): Poziom istotności testu (alfa).
+        lam (float): Hipotetyczny parametr intensywności lambda dla rozkładu Poissona.
+        alfa (float): Poziom istotności testu.
         
     Returns:
         bool: True, jeśli można założyć pochodzenie danych z rozkładu Poissona.
         
     Example:
         >>> awarie_wodociagowe = [10, 27, 29, 16, 8, 7]
-        >>> test_zgodnosci_poissona(awarie_wodociagowe, lambda_param=2.0, poziom_istotnosci=0.05)
+        >>> spr_poisson(awarie_wodociagowe, lam=2.0, alfa=0.05)
         True
     """
-    n = sum(obserwacje)
-    liczba_kategorii = len(obserwacje)
+    suma = sum(obserwacje)
+    n = len(obserwacje)
     
     oczekiwane = [
-        n * ((lam ** k) * math.exp(-lam) / math.factorial(k))
-        for k in range(liczba_kategorii)
+        suma * ((lam ** k) * math.exp(-lam) / math.factorial(k))
+        for k in range(n)
     ]
     
     statystyka = sum(((obs - oczek) ** 2) / oczek for obs, oczek in zip(obserwacje, oczekiwane))
-    df = liczba_kategorii - 1
+    df = n - 1
     
-    war_kryt = chi2.ppf(1 - poziom_istotnosci, df)
+    wart_kryt = chi2.ppf(1 - alfa, df)
     
-    return bool(statystyka < war_kryt)
+    return bool(statystyka < wart_kryt)
