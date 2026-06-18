@@ -1,13 +1,13 @@
 import math
-from typing import Any, Optional, Literal
+from typing import Any, Optional, Literal, Callable
 from scipy.stats import norm, t, chi2
 
 
 # ==========================================
-# CZĘŚĆ I: Twierdzenia Graniczne (X_CTG.ipynb)
+#       CZĘŚĆ I: Twierdzenia Graniczne 
 # ==========================================
 
-def poisson(n: int, p: float, k: int) -> float:
+def poisson_approx(n: int, p: float, k: int) -> float:
     """
     Szacuje prawdopodobieństwo uzyskania dokładnie `k` sukcesów w schemacie Bernoulliego,
     wykorzystując przybliżenie z twierdzenia Poissona.
@@ -21,16 +21,28 @@ def poisson(n: int, p: float, k: int) -> float:
         float: Oszacowane prawdopodobieństwo uzyskania dokładnie `k` sukcesów.
 
     Example:
-        >>> poisson(10000000, 0.00000007, 1)
+        >>> poisson_approx(10000000, 0.00000007, 1)
         0.34760971265398666
     """
     lam = n * p
-    return (lam**k) / math.factorial(k) * math.exp(-lam)
+    return poisson(lam, k)
 
-
-def poisson_ext(n: int, p: float, ks: list[int]) -> tuple[float, float]:
+def poisson(lam: float, k : int) -> float:
     """
-    Szacuje prawdopodobieństwo uzyskania liczby sukcesów ze zbioru `k` oraz błąd oszacowania.
+    Oblicza prawdopodobieństwo `k` sukcesów w rozkładzie Poissona z parametrem `lam`.
+
+    Args:
+        lam (float): Parametr lambda rozkładu Poissona.
+        k (int): Ilość sukcesów.
+
+    Returns:
+        float: Prawdopodobieństwo otrzymania dokładnie `k` sukcesów.
+    """
+    return (lam ** k) / math.factorial(k) * math.exp(-lam)
+
+def multi_poisson_z_bledem(n: int, p: float, ks: list[int]) -> tuple[float, float]:
+    """
+    Szacuje prawdopodobieństwo uzyskania liczby sukcesów ze zbioru `ks` oraz błąd oszacowania.
     
     Wykorzystuje przybliżenie Poissona dla sumy prawdopodobieństw z podanej listy
     oczekiwanych ilości sukcesów w schemacie Bernoulliego.
@@ -38,7 +50,7 @@ def poisson_ext(n: int, p: float, ks: list[int]) -> tuple[float, float]:
     Args:
         n (int): Liczba przeprowadzonych prób.
         p (float): Prawdopodobieństwo odniesienia sukcesu w pojedynczej próbie.
-        k (list[int]): lista interesujących nas ilości sukcesów (np. [0, 1, 2]).
+        ks (list[int]): Lista interesujących nas ilości sukcesów (np. [0, 1, 2]).
 
     Returns:
         tuple[float, float]: Krotka zawierająca:
@@ -46,12 +58,14 @@ def poisson_ext(n: int, p: float, ks: list[int]) -> tuple[float, float]:
             - Maksymalny błąd tego oszacowania.
 
     Example:
-        >>> poisson_ext(10000000, 0.00000007, [0, 1, 2])
+        >>> multi_poisson_z_bledem(10000000, 0.00000007, [0, 1, 2])
         (0.9658584158742916, 4.900000000000001e-08)
     """
     lam = n * p
-    result = [poisson(n, p, k_int) for k_int in ks]
-    return sum(result), (lam ** 2) / n
+    result = 0
+    for k in ks:
+        result += poisson(lam, k)
+    return result, (lam ** 2) / n
 
 
 def CTG(n: int, mu: float, sigma: float, dol: float = -math.inf, gora: float = math.inf) -> float:
@@ -60,6 +74,7 @@ def CTG(n: int, mu: float, sigma: float, dol: float = -math.inf, gora: float = m
 
     Oblicza prawdopodobieństwo tego, że suma `n` niezależnych zmiennych losowych
     o podanej wartości oczekiwanej i odchyleniu standardowym wpadnie w przedział [dol, gora].
+    Korzysta ze wzoru standaryzującego: (S_n - n * mu) / (sigma * sqrt(n)).
 
     Args:
         n (int): Liczba niezależnych zmiennych losowych w sumie.
@@ -72,7 +87,7 @@ def CTG(n: int, mu: float, sigma: float, dol: float = -math.inf, gora: float = m
         float: Szacowane prawdopodobieństwo znalezienia się sumy w przedziale [dol, gora].
 
     Example:
-        >>> CTG(400, 0.3, math.sqrt(0.3 * 0.7), lower_lim=130)
+        >>> CTG(400, 0.3, math.sqrt(0.3 * 0.7), dol=130)
         0.13761676203741713
     """
     return norm.cdf((gora - n * mu) / (sigma * math.sqrt(n))) - norm.cdf((dol - n * mu) / (sigma * math.sqrt(n)))
@@ -80,12 +95,13 @@ def CTG(n: int, mu: float, sigma: float, dol: float = -math.inf, gora: float = m
 
 def rozmiar(p: float, d: float, pb: float) -> int:
     """
-    Oblicza minimalny rozmiar próby wymagany do osiągnięcia zadanego błędu oszacowania.
+    Oblicza minimalny rozmiar próby wymagany do osiągnięcia zadanego błędu oszacowania
+    dla SUMY sukcesów w schemacie Bernoulliego (S_n).
 
     Args:
-        p (float): Ograniczenie na prawdopodobieństwo uzyskania sukcesu.
-        d (float): Rozmiar dopuszczalnego odchylenia (margines błędu).
-        pb (float): Prawdopodobieństwo, z jakim uzyskamy błąd (poziom istotności).
+        p (float): Prawdopodobieństwo uzyskania sukcesu w pojedynczej próbie.
+        d (float): Rozmiar dopuszczalnego odchylenia (dla absolutnej liczby sukcesów, nie dla proporcji).
+        pb (float): Poziom istotności (alfa), czyli prawdopodobieństwo popełnienia błędu.
 
     Returns:
         int: Minimalny rozmiar próby (zaokrąglony w górę do pełnej liczby całkowitej).
@@ -94,14 +110,14 @@ def rozmiar(p: float, d: float, pb: float) -> int:
         >>> rozmiar(0.5, 3.375, 0.5)
         101
     """
-    return math.ceil(d ** 2 / ((norm.ppf((2 - pb) / 2) ** 2) * p * (1 - p)))
+    return math.ceil((d ** 2) / ((norm.ppf(1 - pb/2) ** 2) * p * (1 - p)))
 
 
 # ==========================================
-# CZĘŚĆ II: Estymatory (XI_Estymatory.ipynb)
+#           CZĘŚĆ II: Estymatory 
 # ==========================================
 
-def NEW(dane: list[float]) -> float:
+def no_estymator_wariancji(dane: list[float]) -> float:
     """
     Oblicza nieobciążony estymator wariancji dla podanej próby.
 
@@ -112,7 +128,7 @@ def NEW(dane: list[float]) -> float:
         float: Wartość nieobciążonego estymatora wariancji.
 
     Example:
-        >>> NEW([1, 2, 3, 4, 5, 6, 7, 8, 9])
+        >>> no_estymator_wariancji([1, 2, 3, 4, 5, 6, 7, 8, 9])
         7.5
     """
     n = len(dane)
@@ -121,20 +137,20 @@ def NEW(dane: list[float]) -> float:
     return sum(sq_diff) / (n - 1)
 
 
-def esty_sr(dane: list[float], sigma: float, alfa: float) -> tuple[float, float]:
+def przedzial_ufnosci_srednia(dane: list[float], sigma: float, alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla wartości średniej przy znanym odchyleniu standardowym populacji.
 
     Args:
         dane (list[float]): lista zawierająca wyniki pobrane z próby.
-        od_st (float): Znane odchylenie standardowe w populacji.
+        sigma (float): Znane odchylenie standardowe w populacji.
         alfa (float): Poziom błędu (np. 0.05 dla poziomu ufności 95%).
 
     Returns:
-        Tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności.
+        tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności.
 
     Example:
-        >>> esty_sr([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 1, 0.05)
+        >>> przedzial_ufnosci_srednia([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 1, 0.05)
         (1.6502049676954385, 2.8897950323045616)
     """
     n = len(dane)
@@ -143,7 +159,7 @@ def esty_sr(dane: list[float], sigma: float, alfa: float) -> tuple[float, float]
     return float(x_bar - r), float(x_bar + r)
 
 
-def esty_sr_bez_od(dane: list[float], alfa: float) -> tuple[float, float]:
+def przedzial_ufnosci_srednia_bez_od(dane: list[float], alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla wartości średniej przy nieznanym odchyleniu standardowym populacji.
     
@@ -159,12 +175,12 @@ def esty_sr_bez_od(dane: list[float], alfa: float) -> tuple[float, float]:
         tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności.
 
     Example:
-        >>> esty_sr_bez_od([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 0.05)
+        >>> przedzial_ufnosci_srednia_bez_od([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 0.05)
         (2.1228148457808524, 2.4171851542191476)
     """
     n = len(dane)
     x_bar = sum(dane) / n
-    s = math.sqrt(NEW(dane))
+    s = math.sqrt(no_estymator_wariancji(dane))
 
     if n <= 30:
         dist = t.ppf(1 - alfa / 2, n - 1)
@@ -176,7 +192,7 @@ def esty_sr_bez_od(dane: list[float], alfa: float) -> tuple[float, float]:
     return float(x_bar - r), float(x_bar + r)
 
 
-def esty_war(dane: list[float], alfa: float) -> tuple[float, float]:
+def przedzial_ufnosci_wariancja(dane: list[float], alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla wariancji z wykorzystaniem rozkładu chi-kwadrat.
 
@@ -188,15 +204,15 @@ def esty_war(dane: list[float], alfa: float) -> tuple[float, float]:
         tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności dla wariancji.
 
     Example:
-        >>> esty_war([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 0.05)
+        >>> przedzial_ufnosci_wariancja([2, 2.3, 2.4, 2.5, 1.9, 2.3, 2.5, 2.1, 2.4, 2.3], 0.05)
         (0.020028631166238927, 0.14109075746397742)
     """
     n = len(dane)
-    numerator = (n - 1) * NEW(dane)
+    numerator = (n - 1) * no_estymator_wariancji(dane)
     return float(numerator / chi2.ppf(1 - alfa / 2, n - 1)), float(numerator / chi2.ppf(alfa / 2, n - 1))
 
 
-def esty_prop(lista: list[Any], wart: Any, alfa: float) -> tuple[float, float]:
+def przedzial_ufnosci_proporcja(lista: list[Any], wart: Any, alfa: float) -> tuple[float, float]:
     """
     Wyznacza przedział ufności dla proporcji (częstości występowania danej wartości w populacji).
 
@@ -209,7 +225,7 @@ def esty_prop(lista: list[Any], wart: Any, alfa: float) -> tuple[float, float]:
         tuple[float, float]: Krotka zawierająca dolną i górną granicę przedziału ufności dla proporcji.
 
     Example:
-        >>> esty_prop(["niebieski", "zielony", "czerwony", "żółty", "czerwony", "czerwony", 
+        >>> przedzial_ufnosci_proporcja(["niebieski", "zielony", "czerwony", "żółty", "czerwony", "czerwony", 
         ...            "zielony", "zielony", "żółty", "czerwony", "zielony", "żółty", "niebieski"], "czerwony", 0.05)
         (0.056801752272596207, 0.5585828631120192)
     """
@@ -218,12 +234,9 @@ def esty_prop(lista: list[Any], wart: Any, alfa: float) -> tuple[float, float]:
     r = norm.ppf(1 - alfa / 2) * math.sqrt(p_hat * (1 - p_hat) / n)
     return float(p_hat - r), float(p_hat + r)
 
-"""
-Zestaw narzędzi do testowania podstawowych hipotez statystycznych.
-Zawiera testy parametryczne dla średnich, wariancji oraz testy zgodności.
-Wszystkie funkcje zwracają wartość True, gdy nie ma podstaw do odrzucenia
-hipotezy zerowej (H0), lub False, gdy należy ją odrzucić na rzecz hipotezy alternatywnej.
-"""
+# ==========================================
+#          CZĘŚĆ III: Hipotezy 
+# ==========================================
 
 
 def hipoteza_srednia(
@@ -235,7 +248,7 @@ def hipoteza_srednia(
 ) -> bool:
     """
     Weryfikuje hipotezę o wartości średniej populacji na podstawie jednej próby.
-    W skrócie -  mówi, czy utzymujemy hipotezę zerową.
+    W skrócie - mówi, czy utrzymujemy hipotezę zerową.
     
     W zależności od tego, czy znamy odchylenie standardowe populacji oraz 
     od wielkości próby, funkcja automatycznie dobiera odpowiedni test: 
@@ -263,7 +276,7 @@ def hipoteza_srednia(
     if sigma is not None:
         uzyj_rozkadu_normalnego = True
     else:
-        sigma = math.sqrt(NEW(probka)) if n > 1 else 0.0
+        sigma = math.sqrt(no_estymator_wariancji(probka)) if n > 1 else 0.0
         uzyj_rozkadu_normalnego = n > 30
 
     statystyka = (srednia_proby - srednia_h0) * math.sqrt(n) / sigma
@@ -337,7 +350,7 @@ def hipoteza_porownanie_srednich(
             wart_kryt = norm.ppf(1 - alfa / 2)
             return bool(-wart_kryt < statystyka < wart_kryt)
     else:
-        war1, war2 = NEW(probka1), NEW(probka2)
+        war1, war2 = no_estymator_wariancji(probka1), no_estymator_wariancji(probka2)
         wariancja_spulowana = ((n1 - 1) * war1 + (n2 - 1) * war2) / (n1 + n2 - 2)
         mianownik = math.sqrt(wariancja_spulowana * (1 / n1 + 1 / n2))
         
@@ -367,8 +380,8 @@ def hipoteza_zmienne_zalezne(
     (np. badanie tego samego pacjenta przed i po przyjęciu leku).
 
     Parameters:
-        probka2 (list[float]): Pomiary 1
-        probka1 (list[float]): Pomiary 2
+        probka1 (list[float]): Pomiary 1
+        probka2 (list[float]): Pomiary 2
         roznica_h0 (float): Hipotetyczna średnia różnica (H0), przeważnie 0.
         alfa (float): Poziom istotności.
         typ_hipotezy (Literal["L", "P", "O"]): Kierunek hipotezy.
@@ -389,19 +402,18 @@ def hipoteza_zmienne_zalezne(
     n = len(roznice)
     d_srednie = sum(roznice) / n
 
-    s_d = NEW(roznice)
+    s_d = math.sqrt(no_estymator_wariancji(roznice))
 
     statystyka = (d_srednie - roznica_h0) * math.sqrt(n) / s_d
-    match typ_hipotezy:
-        case 'L':
-            wart_kryt = -t.ppf(1 - alfa, n - 1)
-            return bool(statystyka > wart_kryt)
-        case 'R':
-            wart_kryt = t.ppf(1 - alfa, n - 1)
-            return bool(statystyka < wart_kryt)  
-        case _:
-            wart_kryt = t.ppf(1 - alfa / 2, n - 1)
-            return bool(-wart_kryt < statystyka < wart_kryt)
+    if typ_hipotezy == 'L':
+        wart_kryt = -t.ppf(1 - alfa, n - 1)
+        return bool(statystyka > wart_kryt)
+    elif typ_hipotezy == 'P':
+        wart_kryt = t.ppf(1 - alfa, n - 1)
+        return bool(statystyka < wart_kryt)  
+    else:
+        wart_kryt = t.ppf(1 - alfa / 2, n - 1)
+        return bool(-wart_kryt < statystyka < wart_kryt)
 
 
 def hipoteza_wariancja(
@@ -428,7 +440,7 @@ def hipoteza_wariancja(
         True
     """
     n = len(probka)
-    wariancja_proby = NEW(probka)
+    wariancja_proby = no_estymator_wariancji(probka)
     statystyka = (n - 1) * wariancja_proby / wariancja_h0
     df = n - 1
 
@@ -502,15 +514,144 @@ def spr_poisson(
     """
     suma = sum(obserwacje)
     n = len(obserwacje)
-    
+    # Liczymy wszystkie koszyki oprócz ostatniego
     oczekiwane = [
         suma * ((lam ** k) * math.exp(-lam) / math.factorial(k))
-        for k in range(n)
+        for k in range(n - 1)
     ]
+    # Ostatni koszyk zbiera całą resztę (ogon prawdopodobieństwa P(X >= n-1))
+    oczekiwane.append(suma - sum(oczekiwane))
     
     statystyka = sum(((obs - oczek) ** 2) / oczek for obs, oczek in zip(obserwacje, oczekiwane))
-    df = n - 1
+    df = n - 2
     
     wart_kryt = chi2.ppf(1 - alfa, df)
-    
     return bool(statystyka < wart_kryt)
+
+# ==========================================
+#       CZĘŚĆ IV: Metody monte carlo 
+# ==========================================
+
+def generator_jednostajny(n: int, seed: int = 42, a: float = 0.0, b: float = 1.0) -> list[float]:
+    """
+    Generuje ciąg liczb pseudolosowych z rozkładu jednostajnego na przedziale [a, b].
+
+    Funkcja wykorzystuje prosty generator liniowy kongruentny oparty na algorytmie 
+    Parka-Mullera. Wartości są skalowane do podanego przedziału.
+
+    Args:
+        n (int): Docelowa długość generowanego ciągu.
+        seed (int, optional): Wartość początkowa (ziarno) algorytmu. Domyślnie 42.
+        a (float, optional): Dolna granica przedziału. Domyślnie 0.0.
+        b (float, optional): Górna granica przedziału. Domyślnie 1.0.
+
+    Returns:
+        list[float]: n-elementowa lista liczb pseudolosowych z przedziału [a, b].
+    """
+    if seed <= 0:
+        raise ValueError("Ziarno (seed) w algorytmie Parka-Mullera musi być > 0.")
+        
+    A: int = 2147483647
+    M: int = 16807
+    
+    stan: int = seed # Trzymamy stan jako czystą liczbę całkowitą
+    ciag: list[float] = []
+    
+    for _ in range(n):
+        stan = (stan * M) % A
+        
+        u = stan / A 
+        ciag.append(a + u * abs(b - a))
+
+    return ciag
+
+
+def generator_wykladniczy(n: int, seed: int = 42, lam: float = 1.0) -> list[float]:
+    """
+    Generuje ciąg liczb pseudolosowych z rozkładu wykładniczego.
+
+    Wykorzystuje metodę odwracania dystrybuanty na podstawie wygenerowanych 
+    wcześniej liczb z rozkładu jednostajnego na przedziale [0, 1].
+
+    Args:
+        n (int): Docelowa długość generowanego ciągu.
+        seed (int, optional): Wartość początkowa (ziarno) algorytmu. Domyślnie 42.
+        lam (float, optional): Parametr lambda rozkładu wykładniczego. Domyślnie 1.0.
+
+    Returns:
+        list[float]: n-elementowa lista liczb pseudolosowych z rozkładu wykładniczego.
+    """
+    return [-math.log(1 - x) / lam for x in generator_jednostajny(n, seed, 0.0, 1.0)]
+
+
+def generator_normalny(n: int, seed: int = 42) -> list[float]:
+    """
+    Generuje ciąg liczb pseudolosowych ze standardowego rozkładu normalnego.
+
+    Funkcja implementuje transformację Boxa-Mullera z wykorzystaniem pary 
+    niezależnych ciągów zmiennych losowych o rozkładzie jednostajnym na przedziale [0, 1].
+
+    Args:
+        n (int): Docelowa długość generowanego ciągu.
+        seed (int, optional): Wartość początkowa (ziarno) algorytmu. Domyślnie 42.
+
+    Returns:
+        list[float]: n-elementowa lista liczb pseudolosowych z rozkładu normalnego 
+        o wartości średniej 0 i wariancji 1.
+    """
+    ciag: list[float] = generator_jednostajny(2 * n, seed, 0.0, 1.0)
+    xs: list[float] = ciag[:n]
+    ys: list[float] = ciag[n:]
+    gs: list[float] = []
+    
+    for x, y in zip(xs, ys):
+        sq_ln: float = math.sqrt(-2 * math.log(x))
+        gs.append(sq_ln * math.cos(2 * math.pi * y))
+        
+    return gs
+
+
+def generator_kostka(n: int, k: int = 6, seed: int = 42) -> list[int]:
+    """
+    Generuje ciąg liczb pseudolosowych symulujących rzuty wielościenną kostką.
+
+    Funkcja bazuje na rozkładzie jednostajnym na odcinku [1, k+1],
+    z którego pobierana jest część całkowita z zachowaniem górnej granicy.
+
+    Args:
+        n (int): Docelowa długość generowanego ciągu (liczba rzutów).
+        k (int, optional): Liczba ścianek na kostce. Domyślnie 6.
+        seed (int, optional): Wartość początkowa (ziarno) algorytmu. Domyślnie 42.
+
+    Returns:
+        list[int]: n-elementowa lista wyników rzutu k-ścienną kostką.
+    """
+    return [min(math.floor(x), k) for x in generator_jednostajny(n, seed, 1.0, k + 1.0)]
+
+
+def calka_MC(
+    fun: Callable[[float], float], 
+    n: int = 1000000, 
+    a: float = 0.0, 
+    b: float = 1.0, 
+    seed: int = 42
+) -> float:
+    """
+    Szacuje wartość całki oznaczonej z funkcji na przedziale metodą Monte Carlo.
+
+    Oblicza wartość oczekiwaną dla próbek funkcji na losowych punktach, 
+    korzystając z wygenerowanego ciągu o rozkładzie jednostajnym.
+
+    Args:
+        fun (Callable[[float], float]): Funkcja przyjmująca argument typu float 
+            i zwracająca wartość typu float, której całkę chcemy oszacować.
+        n (int, optional): Długość ciągu liczb pseudolosowych użytych do szacowania. 
+            Domyślnie 1 000 000.
+        a (float, optional): Dolna granica całkowania. Domyślnie 0.0.
+        b (float, optional): Górna granica całkowania. Domyślnie 1.0.
+        seed (int, optional): Wartość początkowa (ziarno) algorytmu. Domyślnie 42.
+
+    Returns:
+        float: Przybliżona wartość całki oznaczonej funkcji na przedziale [a, b].
+    """
+    return abs(b - a) * sum([fun(x) for x in generator_jednostajny(n, seed, a, b)]) / n
