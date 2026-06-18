@@ -38,7 +38,10 @@ def poisson(lam: float, k : int) -> float:
     Returns:
         float: Prawdopodobieństwo otrzymania dokładnie `k` sukcesów.
     """
-    return (lam ** k) / math.factorial(k) * math.exp(-lam)
+    result = math.exp(-lam)
+    for i in range(1, k + 1):
+        result *= lam / i
+    return result
 
 def multi_poisson_z_bledem(n: int, p: float, ks: list[int]) -> tuple[float, float]:
     """
